@@ -1,0 +1,62 @@
+name: Project Automation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      project_name:
+        description: 'Project to work on'
+        required: true
+        type: string
+      task_type:
+        description: 'Type of task'
+        required: true
+        type: choice
+        options:
+          - setup_project
+          - create_branch
+          - run_tests
+          - deploy
+
+jobs:
+  automate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Project Setup
+        if: github.event.inputs.task_type == 'setup_project'
+        run: |
+          echo "Setting up project: ${{ github.event.inputs.project_name }}"
+          mkdir -p ${{ github.event.inputs.project_name }}/{src,tests,docs}
+          touch ${{ github.event.inputs.project_name }}/README.md
+          
+      - name: Create Feature Branch
+        if: github.event.inputs.task_type == 'create_branch'
+        run: |
+          git checkout -b feature/${{ github.event.inputs.project_name }}
+          git push origin feature/${{ github.event.inputs.project_name }}
+          
+      - name: Run Tests
+        if: github.event.inputs.task_type == 'run_tests'
+        run: |
+          python -m pytest tests/
+          
+      - name: Deploy
+        if: github.event.inputs.task_type == 'deploy'
+        run: |
+          echo "Deploying ${{ github.event.inputs.project_name }}"
