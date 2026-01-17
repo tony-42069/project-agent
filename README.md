@@ -284,7 +284,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [OpenAI](https://openai.com/) for GPT-4o
 - [GitHub](https://github.com/) for the API
 - [Python Telegram Bot](https://github.com/python-telegram-bot/python-telegram-bot) community
-
----
-
-**Built with ❤️ for developers who manage many repositories**
