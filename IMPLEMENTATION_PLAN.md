@@ -62,6 +62,32 @@
 - [x] Implement file content fetching with pagination
 - [x] Add retry logic with exponential backoff
 
+### Task 2.1: Repo Scanner
+- [x] Implement `RepoDiscovery` service
+- [x] Fetch complete repo list from GitHub API
+- [x] Filter out forks and archived repos
+- [x] Create local index of all repos with metadata
+
+### Task 2.2: File Fetching System
+- [x] Create `FileFetcher` with concurrent downloads
+- [x] Implement intelligent file prioritization
+- [x] Add support for large repositories (pagination)
+- [x] Cache fetched contents locally
+
+### Task 2.3: Structure Analyzer
+- [x] Create `StructureAnalyzer` service
+- [x] Detect project type (Python, Node, Go, etc.)
+- [x] Identify key files (README, setup.py, package.json, etc.)
+- [x] Generate directory tree representation
+- [x] Detect test frameworks and patterns
+
+### Task 2.4: Documentation Analyzer
+- [x] Create `DocAnalyzer` service
+- [x] Extract and parse README files
+- [x] Identify outdated documentation
+- [x] Extract tech stack from docs
+- [x] Flag missing documentation
+
 ### Task 3.1: OpenAI Integration
 - [x] Create `OpenAIClient` singleton
 - [x] Implement streaming response handling
