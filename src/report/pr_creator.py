@@ -32,7 +32,7 @@ class PRInfo:
 
 
 @dataclass
- class PRCreationResult:
+class PRCreationResult:
     """Result of PR creation."""
     success: bool
     pr_number: Optional[int]

@@ -46,8 +46,9 @@ def setup_logging(
         logging.root.addHandler(file_handler)
 
     structlog.configure(
-        wrapper_class=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
         context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
         processors=processors,
         cache_logger_on_first_use=True,
     )
