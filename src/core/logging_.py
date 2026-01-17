@@ -46,9 +46,8 @@ def setup_logging(
         logging.root.addHandler(file_handler)
 
     structlog.configure(
-        wrapper_class=structlog.stdlib.RealProxyLogger,
+        wrapper_class=structlog.stdlib.LoggerFactory(),
         context_class=dict,
-        logger_factory=structlog.stdlib.LoggerFactory(),
         processors=processors,
         cache_logger_on_first_use=True,
     )
