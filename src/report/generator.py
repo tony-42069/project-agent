@@ -186,6 +186,9 @@ Generated: {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}
 
         rows = []
         for issue in issues[:20]:
+            # Skip non-dict issues
+            if not isinstance(issue, dict):
+                continue
             severity = issue.get("severity", "unknown")
             severity_emoji = {
                 "high": "🔴",
@@ -194,7 +197,7 @@ Generated: {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}
             }.get(severity, "⚪")
 
             file = issue.get("file", "Unknown")
-            desc = issue.get("description", "")[:50]
+            desc = str(issue.get("description", ""))[:50]
             rows.append(f"| {severity_emoji} | {file} | {desc} |")
 
         header = "| Severity | File | Description |\n|----------|------|-------------|\n"

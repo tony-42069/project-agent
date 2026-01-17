@@ -164,9 +164,10 @@ Provide a JSON response with:
         structure_info: Dict[str, Any],
     ) -> ReviewResult:
         """Perform a comprehensive review of a repository."""
+        # Limit content to stay under token limits (roughly 4 chars per token)
         files_text = "\n\n".join(
-            f"=== {path} ===\n{content[:3000]}"
-            for path, content in list(file_contents.items())[:20]
+            f"=== {path} ===\n{content[:1500]}"
+            for path, content in list(file_contents.items())[:10]
         )
 
         prompt = f"""Review this repository: {repo_name}

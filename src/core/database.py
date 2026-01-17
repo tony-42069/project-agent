@@ -208,6 +208,11 @@ class Database:
                     if db_repo:
                         repo_id = db_repo.id
 
+            # Skip saving if we couldn't find the repo_id (review will still complete)
+            if repo_id is None:
+                logger.warning(f"Could not find repository_id for review, skipping database save")
+                return None
+
             review = ReviewSession(
                 repository_id=repo_id,
                 status=review_result.get("status", "completed"),
