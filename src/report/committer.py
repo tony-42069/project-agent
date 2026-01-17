@@ -25,7 +25,8 @@ class RepoCommitter:
         branch_name: Optional[str] = None,
     ) -> bool:
         """Commit a report to the repository."""
-        branch = branch_name or config.report.branch_name
+        # Use repo's default branch if no branch specified
+        branch = branch_name or repo.default_branch or "main"
         file_path = "REPO_STATUS.md"
 
         try:

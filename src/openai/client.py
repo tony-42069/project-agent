@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -17,6 +18,40 @@ from ..core.logging_ import get_logger
 logger = get_logger(__name__)
 
 config = get_config()
+
+
+def safe_parse_json(text: str) -> Dict[str, Any]:
+    """Safely parse JSON from OpenAI response, handling markdown code blocks."""
+    if not text or not text.strip():
+        return {}
+
+    text = text.strip()
+
+    # Try direct parse first
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Try to extract JSON from markdown code blocks
+    patterns = [
+        r'```json\s*([\s\S]*?)\s*```',
+        r'```\s*([\s\S]*?)\s*```',
+        r'\{[\s\S]*\}',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            try:
+                json_str = match.group(1) if '```' in pattern else match.group(0)
+                return json.loads(json_str)
+            except (json.JSONDecodeError, IndexError):
+                continue
+
+    # Return empty dict with error info if all parsing fails
+    logger.warning(f"Failed to parse JSON from response: {text[:100]}...")
+    return {"error": "Failed to parse response", "raw": text[:500]}
 
 
 @dataclass
@@ -115,12 +150,12 @@ Provide a JSON response with:
         if config.openai.cache_enabled:
             cached = self.cache.get(prompt)
             if cached:
-                return json.loads(cached)
+                return safe_parse_json(cached)
 
         response = await self._call_api(prompt)
         self.cache.set(prompt, response)
 
-        return json.loads(response)
+        return safe_parse_json(response)
 
     async def review_repository(
         self,
@@ -176,13 +211,13 @@ Focus on identifying:
         if config.openai.cache_enabled:
             cached = self.cache.get(prompt)
             if cached:
-                data = json.loads(cached)
+                data = safe_parse_json(cached)
                 return self._build_review_result(repo_name, data, len(file_contents))
 
         response = await self._call_api(prompt)
         self.cache.set(prompt, response)
 
-        data = json.loads(response)
+        data = safe_parse_json(response)
         return self._build_review_result(repo_name, data, len(file_contents))
 
     async def suggest_improvements(
@@ -205,7 +240,7 @@ Provide a JSON array of improvement suggestions:
 ["suggestion 1", "suggestion 2", ...]"""
 
         response = await self._call_api(prompt)
-        return json.loads(response)
+        return safe_parse_json(response)
 
     async def generate_documentation(
         self,
