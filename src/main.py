@@ -1,6 +1,7 @@
 """Main entry point for Project Agent."""
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 

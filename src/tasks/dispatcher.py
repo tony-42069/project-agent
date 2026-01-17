@@ -334,6 +334,6 @@ class TaskDispatcher:
                     break
 
             for task in temp_list:
-                await q.put(task)
+                q.put_nowait(task)
 
         return tasks[:limit]
