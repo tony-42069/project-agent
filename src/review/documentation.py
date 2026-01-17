@@ -1,7 +1,7 @@
 """Documentation analyzer for reviewing and improving documentation."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from ..core.config import get_config
@@ -33,10 +33,10 @@ class DocAnalysis:
     has_setup_instructions: bool = False
     has_examples: bool = False
     readme_quality: int = 0
-    issues: List[DocIssue] = []
-    missing_docs: List[str] = []
-    outdated_info: List[str] = []
-    tech_stack: List[str] = []
+    issues: List[DocIssue] = field(default_factory=list)
+    missing_docs: List[str] = field(default_factory=list)
+    outdated_info: List[str] = field(default_factory=list)
+    tech_stack: List[str] = field(default_factory=list)
     summary: str = ""
 
 
