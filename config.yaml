@@ -1,0 +1,90 @@
+# Project Agent Configuration
+# All settings can be overridden via environment variables
+
+# Application Settings
+app:
+  name: "project-agent"
+  debug: false
+  log_level: "INFO"
+  host: "0.0.0.0"
+  port: 8000
+
+# Database Settings
+database:
+  path: "data/project_agent.db"
+  echo: false
+
+# GitHub Settings
+github:
+  api_url: "https://api.github.com"
+  token_env: "GITHUB_TOKEN"
+  rate_limit_wait: 1.0  # seconds to wait when rate limited
+  max_retries: 3
+  timeout: 30
+
+# OpenAI Settings
+openai:
+  api_key_env: "OPENAI_API_KEY"
+  model: "gpt-4o"
+  max_tokens: 4096
+  temperature: 0.3
+  cache_enabled: true
+  cache_ttl: 3600  # seconds
+
+# Telegram Bot Settings
+telegram:
+  enabled: true
+  token_env: "TELEGRAM_BOT_TOKEN"
+  webhook_url_env: "TELEGRAM_WEBHOOK_URL"
+  poll_timeout: 10
+
+# Review Settings
+review:
+  max_files_per_repo: 100
+  file_size_limit: 100000  # bytes
+  exclude_patterns:
+    - "*.pyc"
+    - "*.pyo"
+    - "*.so"
+    - "*.a"
+    - "*.lib"
+    - "node_modules/"
+    - ".git/"
+    - "__pycache__/"
+    - ".venv/"
+    - "venv/"
+    - "*.min.js"
+    - "*.min.css"
+  include_extensions:
+    - ".py"
+    - ".js"
+    - ".ts"
+    - ".go"
+    - ".rs"
+    - ".java"
+    - ".cpp"
+    - ".c"
+    - ".h"
+    - ".md"
+    - ".txt"
+    - ".json"
+    - ".yaml"
+    - ".yml"
+    - ".toml"
+
+# Report Settings
+report:
+  output_dir: "reports"
+  branch_name: "repo-status-update"
+  commit_message: "docs: Update REPO_STATUS.md with latest review"
+
+# Task Settings
+task:
+  queue_size: 10
+  timeout: 300  # seconds
+  max_retries: 2
+
+# Monitoring Settings
+monitoring:
+  health_check_interval: 60
+  metrics_enabled: true
