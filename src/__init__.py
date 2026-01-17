@@ -6,7 +6,23 @@ __author__ = "Project Agent"
 from .core import Config, settings, Database, get_db, LoggingMixin, get_logger
 from .github import GitHubClient
 from .openai import OpenAIClient
-from .review import CodeAnalyzer, ReviewOrchestrator
+from .review import CodeAnalyzer, ReviewOrchestrator, RepoDiscovery, DocumentationAnalyzer
+from .report import (
+    ReportGenerator,
+    RepoCommitter,
+    BranchManager,
+    PRCreator,
+    ReviewWorkflow,
+)
+from .tasks import (
+    TaskDispatcher,
+    TaskExecutor,
+    TaskInterpreter,
+    Task,
+    TaskPriority,
+    TaskStatus,
+    TaskType,
+)
 
 __all__ = [
     "__version__",
@@ -20,4 +36,18 @@ __all__ = [
     "OpenAIClient",
     "CodeAnalyzer",
     "ReviewOrchestrator",
+    "RepoDiscovery",
+    "DocumentationAnalyzer",
+    "ReportGenerator",
+    "RepoCommitter",
+    "BranchManager",
+    "PRCreator",
+    "ReviewWorkflow",
+    "TaskDispatcher",
+    "TaskExecutor",
+    "TaskInterpreter",
+    "Task",
+    "TaskPriority",
+    "TaskStatus",
+    "TaskType",
 ]

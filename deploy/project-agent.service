@@ -1,0 +1,28 @@
+[Unit]
+Description=Project Agent - AI-powered GitHub project management
+Documentation=https://github.com/tony-42069/project-agent
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=project-agent
+Group=project-agent
+WorkingDirectory=/opt/project-agent
+EnvironmentFile=/opt/project-agent/.env
+ExecStart=/opt/project-agent/venv/bin/python -m src api
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/project-agent/agent.log
+StandardError=append:/var/log/project-agent/agent-error.log
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/project-agent/data /opt/project-agent/logs /opt/project-agent/reports
+
+[Install]
+WantedBy=multi-user.target
