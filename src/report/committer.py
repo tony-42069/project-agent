@@ -1,7 +1,7 @@
 """Commit report files to repositories."""
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ..core.config import get_config
 from ..core.logging_ import get_logger
