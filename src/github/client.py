@@ -118,21 +118,32 @@ class GitHubClient:
 
     def _handle_rate_limit(self) -> None:
         """Handle rate limiting by waiting if necessary."""
-        rate_limit = self.client.get_rate_limit()
-        core = rate_limit.core
+        try:
+            rate_limit = self.client.get_rate_limit()
+            # Handle different PyGithub versions
+            if hasattr(rate_limit, 'core'):
+                core = rate_limit.core
+            elif hasattr(rate_limit, 'rate'):
+                core = rate_limit.rate
+            else:
+                # Fallback: skip rate limit handling if API changed
+                logger.debug("Could not get rate limit info, skipping")
+                return
 
-        self._rate_limit_info = RateLimitInfo(
-            remaining=core.remaining,
-            limit=core.limit,
-            reset_at=core.reset,
-            used=core.used,
-        )
+            self._rate_limit_info = RateLimitInfo(
+                remaining=core.remaining,
+                limit=core.limit,
+                reset_at=core.reset,
+                used=getattr(core, 'used', 0),
+            )
 
-        if core.remaining < 10:
-            wait_time = (core.reset - datetime.utcnow()).total_seconds()
-            if wait_time > 0:
-                logger.warning(f"Rate limit low ({core.remaining}). Waiting {wait_time:.1f}s")
-                time.sleep(min(wait_time + 1, 60))
+            if core.remaining < 10:
+                wait_time = (core.reset - datetime.utcnow()).total_seconds()
+                if wait_time > 0:
+                    logger.warning(f"Rate limit low ({core.remaining}). Waiting {wait_time:.1f}s")
+                    time.sleep(min(wait_time + 1, 60))
+        except Exception as e:
+            logger.debug(f"Rate limit check failed: {e}")
 
     def _retry_strategy(self) -> Retrying:
         """Create retry strategy for API calls."""
