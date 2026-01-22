@@ -59,12 +59,14 @@ class CodeAnalyzer:
         if content:
             ai_result = await self.openai.analyze_code(content, path)
             if isinstance(ai_result, dict):
-                if "issues" in ai_result:
-                    analysis.issues.extend(ai_result["issues"])
-                if "summary" in ai_result:
+                if "issues" in ai_result and isinstance(ai_result["issues"], list):
+                    # Only extend with dict issues, skip strings
+                    valid_issues = [i for i in ai_result["issues"] if isinstance(i, dict)]
+                    analysis.issues.extend(valid_issues)
+                if "summary" in ai_result and isinstance(ai_result["summary"], str):
                     analysis.summary = ai_result["summary"]
-                if "quality_score" in ai_result:
-                    analysis.quality_score = ai_result["quality_score"]
+                if "quality_score" in ai_result and isinstance(ai_result["quality_score"], (int, float)):
+                    analysis.quality_score = int(ai_result["quality_score"])
 
         return analysis
 

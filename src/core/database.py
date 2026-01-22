@@ -191,8 +191,30 @@ class Database:
     ) -> ReviewSession:
         """Save a review session."""
         async with self.session() as session:
+            # Get repo_id - handle dataclass, dict, or db model
+            repo_id = None
+            if hasattr(repo, "id") and repo.id is not None:
+                repo_id = repo.id
+            elif isinstance(repo, dict) and "id" in repo:
+                repo_id = repo["id"]
+            else:
+                # Look up by full_name
+                full_name = repo.full_name if hasattr(repo, "full_name") else repo.get("full_name")
+                if full_name:
+                    result = await session.execute(
+                        Repository.__table__.select().where(Repository.full_name == full_name)
+                    )
+                    db_repo = result.fetchone()
+                    if db_repo:
+                        repo_id = db_repo.id
+
+            # Skip saving if we couldn't find the repo_id (review will still complete)
+            if repo_id is None:
+                logger.warning(f"Could not find repository_id for review, skipping database save")
+                return None
+
             review = ReviewSession(
-                repository_id=repo.id if hasattr(repo, "id") else repo["id"],
+                repository_id=repo_id,
                 status=review_result.get("status", "completed"),
                 overall_score=review_result.get("overall_score"),
                 quality_score=review_result.get("quality_score"),
