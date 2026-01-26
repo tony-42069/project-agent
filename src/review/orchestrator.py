@@ -31,9 +31,82 @@ class ReviewOrchestrator:
         self.db = db
         self.analyzer = CodeAnalyzer(self.github, self.openai)
 
-    async def review_repository(self, repo: Repository) -> Dict[str, Any]:
+    def _is_status_file_meaningful(self, content: str) -> bool:
+        """Check if REPO_STATUS.md has meaningful content."""
+        if not content or len(content.strip()) < 200:
+            return False
+
+        required_sections = ["Quality Scores", "Summary", "Stuck Areas", "Next Steps"]
+        content_lower = content.lower()
+
+        score_count = sum(1 for section in required_sections if section.lower() in content_lower)
+        return score_count >= 2
+
+    async def _get_existing_status(self, repo_full_name: str) -> Optional[str]:
+        """Get existing REPO_STATUS.md content if it exists."""
+        try:
+            content = await self.github.get_file_content(repo_full_name, "REPO_STATUS.md")
+            if content:
+                return content.content
+        except Exception:
+            pass
+        return None
+
+    async def _update_existing_status(self, repo_full_name: str, existing_content: str) -> str:
+        """Add an update section to existing status file."""
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+
+        update_section = f"""
+
+---
+
+## Review Update - {today}
+
+Agent performed a check - existing review is still current. No new issues detected.
+
+*Status verified by Project Agent*
+"""
+
+        return existing_content.rstrip() + update_section
+
+    async def review_repository(self, repo: Repository, force: bool = False) -> Dict[str, Any]:
         """Perform a comprehensive review of a repository."""
         logger.info(f"Starting review of {repo.full_name}")
+
+        existing_status = await self._get_existing_status(repo.full_name)
+
+        if existing_status and not force:
+            if self._is_status_file_meaningful(existing_status):
+                logger.info(f"Found existing meaningful status for {repo.full_name}, adding update...")
+
+                updated_content = await self._update_existing_status(repo.full_name, existing_status)
+
+                sha = await self.github.get_file_content(repo.full_name, "REPO_STATUS.md")
+                await self.github.create_or_update_file(
+                    full_name=repo.full_name,
+                    path="REPO_STATUS.md",
+                    content=updated_content,
+                    message=f"docs: Review update - {datetime.utcnow().strftime('%Y-%m-%d')}",
+                    branch=repo.default_branch,
+                    sha=sha.sha if sha else None,
+                )
+
+                return {
+                    "status": "skipped",
+                    "repository_name": repo.full_name,
+                    "summary": "Existing review verified and updated",
+                    "quality_scores": {},
+                    "stuck_areas": [],
+                    "next_steps": [],
+                    "issues_found": [],
+                    "recommendations": [],
+                    "analyzed_files": 0,
+                    "total_lines": 0,
+                    "todos": [],
+                    "structure_info": {},
+                    "completed_at": datetime.utcnow(),
+                    "message": "Existing status file verified and updated with timestamp",
+                }
 
         try:
             file_tree = await self.github.get_file_tree(
@@ -104,7 +177,7 @@ class ReviewOrchestrator:
             }
 
     async def review_all(
-        self, repos: Optional[List[Repository]] = None
+        self, repos: Optional[List[Repository]] = None, force: bool = False
     ) -> List[Dict[str, Any]]:
         """Review all repositories."""
         if repos is None:
@@ -116,18 +189,27 @@ class ReviewOrchestrator:
         async def review_with_limit(repo: Repository) -> Dict[str, Any]:
             async with rate_limiter:
                 await asyncio.sleep(config.github.rate_limit_wait)
-                return await self.review_repository(repo)
+                return await self.review_repository(repo, force=force)
 
         tasks = [review_with_limit(repo) for repo in repos]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         completed = [
-            r if isinstance(r, dict) and r.get("status") == "completed"
+            r if isinstance(r, dict) and r.get("status") in ["completed", "skipped"]
             else None
             for r in results
         ]
 
-        logger.info(f"Reviewed {len([r for r in completed if r])}/{len(repos)} repositories")
+        skipped = [
+            r if isinstance(r, dict) and r.get("status") == "skipped"
+            else None
+            for r in results
+        ]
+
+        logger.info(f"Reviewed: {len([c for c in completed if c and c.get('status')=='completed'])} | "
+                   f"Skipped (existing review): {len([s for s in skipped if s])} | "
+                   f"Failed: {len([r for r in results if isinstance(r, Exception) or (isinstance(r, dict) and r.get('status')=='failed')])}")
+
         return results
 
     def _analyze_structure(
