@@ -15,13 +15,24 @@ def check_environment() -> bool:
     """Check that required environment variables are set."""
     from .core.config import settings
 
-    required = ["GITHUB_TOKEN", "OPENAI_API_KEY"]
+    minimax_key = os.getenv("MINIMAX_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+    github_token = os.getenv("GITHUB_TOKEN")
 
-    missing = [var for var in required if not os.getenv(var)]
-    if missing:
-        logger.error(f"Missing required environment variables: {', '.join(missing)}")
-        logger.info("Please set these variables in your .env file or environment")
+    if not github_token:
+        logger.error("Missing required environment variable: GITHUB_TOKEN")
+        logger.info("Please set GITHUB_TOKEN in your .env file or environment")
         return False
+
+    if not minimax_key and not openai_key:
+        logger.error("Missing required environment variable: MINIMAX_API_KEY or OPENAI_API_KEY")
+        logger.info("Please set either MINIMAX_API_KEY or OPENAI_API_KEY in your .env file")
+        return False
+
+    if minimax_key:
+        logger.info("Using MiniMax M2.1 API")
+    else:
+        logger.info("Using OpenAI API")
 
     logger.info("Environment check passed")
     return True
