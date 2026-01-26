@@ -11,7 +11,7 @@ An AI-powered autonomous agent for managing, reviewing, and improving your entir
 ## ✨ What It Does
 
 - 🔍 **Scans all your repositories** (public + private) via GitHub API
-- 📊 **Analyzes code quality** using GLM-4 for intelligent review
+- 📊 **Analyzes code quality** using MiniMax M2.1 for intelligent review
 - 📝 **Generates status reports** (`REPO_STATUS.md`) for each repository
 - 🐛 **Identifies bugs and stuck areas** with TODO/FIXME detection
 - 🎯 **Recommends next steps** for each project
@@ -25,7 +25,7 @@ An AI-powered autonomous agent for managing, reviewing, and improving your entir
 
 - Python 3.10+
 - GitHub Personal Access Token
-- GLM-4 API Key (recommended) or OpenAI API Key
+- MiniMax M2.1 API Key (recommended) or OpenAI API Key
 - Telegram Bot Token (optional, for commands)
 
 ### Installation
@@ -48,7 +48,7 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your API keys:
 # - GITHUB_TOKEN=ghp_xxxxx
-# - GLM_API_KEY=sk-xxxxx (or OPENAI_API_KEY)
+# - MINIMAX_API_KEY=sk-xxxxx (or OPENAI_API_KEY)
 # - TELEGRAM_BOT_TOKEN=12345:xxxxx
 ```
 
@@ -81,7 +81,7 @@ python -m src bot
 - Documentation quality assessment
 
 ### AI-Powered Code Review
-- GLM-4 powered comprehensive code analysis
+- MiniMax M2.1 powered comprehensive code analysis
 - Quality scoring (code quality, documentation, structure, testing)
 - Bug and issue detection
 - TODO/FIXME identification
@@ -146,8 +146,8 @@ project-agent/
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `GITHUB_TOKEN` | ✅ | GitHub Personal Access Token |
-| `GLM_API_KEY` | ✅ | GLM-4 API Key |
-| `OPENAI_API_KEY` | ❌ | OpenAI API Key (alternative to GLM) |
+| `MINIMAX_API_KEY` | ✅ | MiniMax M2.1 API Key |
+| `OPENAI_API_KEY` | ❌ | OpenAI API Key (alternative to MiniMax) |
 | `TELEGRAM_BOT_TOKEN` | ❌ | Telegram Bot Token |
 | `TELEGRAM_WEBHOOK_URL` | ❌ | Telegram Webhook URL |
 
@@ -163,8 +163,8 @@ github:
   rate_limit_wait: 1.0
   max_retries: 3
 
-openai:
-  model: "glm-4"
+minimax:
+  model: "MiniMax-M2.1"
   temperature: 0.3
 
 review:
@@ -282,6 +282,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [智谱AI](https://www.zhipuai.com/) for GLM-4
+- [MiniMax](https://www.minimaxi.com/) for M2.1
 - [GitHub](https://github.com/) for the API
 - [Python Telegram Bot](https://github.com/python-telegram-bot/python-telegram-bot) community

@@ -22,7 +22,17 @@ github:
   max_retries: 3
   timeout: 30
 
-# OpenAI Settings
+# MiniMax Settings
+minimax:
+  api_key_env: "MINIMAX_API_KEY"
+  model: "MiniMax-M2.1"
+  max_tokens: 4096
+  temperature: 0.3
+  cache_enabled: true
+  cache_ttl: 3600  # seconds
+  api_base: "https://api.minimax.chat/v1/text/chatcompletion_v2"
+
+# OpenAI Settings (alternative - use if MINIMAX_API_KEY not set)
 openai:
   api_key_env: "OPENAI_API_KEY"
   model: "gpt-4o"
