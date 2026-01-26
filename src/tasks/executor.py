@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from ..core.config import get_config
 from ..core.logging_ import get_logger
 from ..github import GitHubClient
-from ..openai import OpenAIClient
+from ..llm import LLMClient
 from ..report import ReportGenerator
 from ..review import ReviewOrchestrator
 from .interpreter import Task, TaskStatus, TaskType
@@ -38,11 +38,11 @@ class TaskExecutor:
     def __init__(
         self,
         github_client: GitHubClient,
-        openai_client: OpenAIClient,
+        llm_client: LLMClient,
         review_orchestrator: Optional[ReviewOrchestrator] = None,
     ):
         self.github = github_client
-        self.openai = openai_client
+        self.llm = llm_client
         self.review_orchestrator = review_orchestrator
         self.report_gen = ReportGenerator()
 
@@ -166,7 +166,7 @@ Target files: {', '.join(task.target_files) if task.target_files else 'Not speci
 Provide a fix for the bug. Return the file path and the fixed code.
 """
 
-        response = await self.openai._call_api(prompt)
+        response = await self.llm._call_api(prompt)
 
         return {"output": f"Bug fix analysis: {response}"}
 
@@ -193,7 +193,7 @@ Existing files: {[f['path'] for f in file_tree[:10]]}
 Provide the implementation code. Focus on clean, well-documented code.
 """
 
-        response = await self.openai._call_api(prompt)
+        response = await self.llm._call_api(prompt)
 
         return {"output": f"Feature implementation: {response}"}
 
@@ -219,7 +219,7 @@ Existing README:
 Provide updated documentation in markdown format.
 """
 
-        response = await self.openai._call_api(prompt)
+        response = await self.llm._call_api(prompt)
 
         success = await self.github.create_or_update_file(
             full_name=task.repository,
@@ -259,7 +259,7 @@ Original code:
 Provide the refactored code with improvements.
 """
 
-        response = await self.openai._call_api(prompt)
+        response = await self.llm._call_api(prompt)
 
         return {"output": f"Refactoring suggestions: {response}"}
 
@@ -327,6 +327,6 @@ Target files: {', '.join(task.target_files) if task.target_files else 'Not speci
 Provide a detailed response on how to accomplish this task.
 """
 
-        response = await self.openai._call_api(prompt)
+        response = await self.llm._call_api(prompt)
 
         return {"output": response}

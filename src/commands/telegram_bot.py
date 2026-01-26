@@ -11,7 +11,7 @@ from ..core.config import get_config
 from ..core.database import Database
 from ..core.logging_ import get_logger
 from ..github import GitHubClient
-from ..openai import OpenAIClient
+from ..llm import LLMClient
 from ..report import ReportGenerator
 from ..review import ReviewOrchestrator
 from .parser import CommandParser
@@ -32,9 +32,9 @@ class TelegramBot:
         self.application = Application.builder().token(self.token).build()
         self.parser = CommandParser()
         self.github = GitHubClient()
-        self.openai = OpenAIClient()
+        self.llm = LLMClient()
         self.db = Database()
-        self.orchestrator = ReviewOrchestrator(self.github, self.openai, self.db)
+        self.orchestrator = ReviewOrchestrator(self.github, self.llm, self.db)
         self.report_gen = ReportGenerator()
 
     async def start(self, update, context: ContextTypes.DEFAULT_TYPE):

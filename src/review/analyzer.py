@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from ..core.config import get_config
 from ..core.logging_ import get_logger
 from ..github import GitHubClient, FileContent
-from ..openai import OpenAIClient
+from ..llm import LLMClient
 
 logger = get_logger(__name__)
 
@@ -34,9 +34,9 @@ class FileAnalysis:
 class CodeAnalyzer:
     """Service for analyzing code in repositories."""
 
-    def __init__(self, github_client: GitHubClient, openai_client: OpenAIClient):
+    def __init__(self, github_client: GitHubClient, llm_client: LLMClient):
         self.github = github_client
-        self.openai = openai_client
+        self.llm = llm_client
 
     async def analyze_file(self, content: str, path: str) -> FileAnalysis:
         """Analyze a single file."""
@@ -57,7 +57,7 @@ class CodeAnalyzer:
         analysis.quality_score = self._calculate_quality_score(analysis)
 
         if content:
-            ai_result = await self.openai.analyze_code(content, path)
+            ai_result = await self.llm.analyze_code(content, path)
             if isinstance(ai_result, dict):
                 if "issues" in ai_result and isinstance(ai_result["issues"], list):
                     # Only extend with dict issues, skip strings
