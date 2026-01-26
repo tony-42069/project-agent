@@ -1,4 +1,4 @@
-"""OpenAI integration for code review and analysis."""
+"""LLM integration for code review - supports MiniMax M2.1 and OpenAI."""
 
 import hashlib
 import json
@@ -9,9 +9,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletion
-
 from ..core.config import get_config
 from ..core.logging_ import get_logger
 
@@ -21,19 +18,17 @@ config = get_config()
 
 
 def safe_parse_json(text: str) -> Dict[str, Any]:
-    """Safely parse JSON from OpenAI response, handling markdown code blocks."""
+    """Safely parse JSON from API response, handling markdown code blocks."""
     if not text or not text.strip():
         return {}
 
     text = text.strip()
 
-    # Try direct parse first
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
 
-    # Try to extract JSON from markdown code blocks
     patterns = [
         r'```json\s*([\s\S]*?)\s*```',
         r'```\s*([\s\S]*?)\s*```',
@@ -49,7 +44,6 @@ def safe_parse_json(text: str) -> Dict[str, Any]:
             except (json.JSONDecodeError, IndexError):
                 continue
 
-    # Return empty dict with error info if all parsing fails
     logger.warning(f"Failed to parse JSON from response: {text[:100]}...")
     return {"error": "Failed to parse response", "raw": text[:500]}
 
@@ -87,11 +81,9 @@ class ResponseCache:
         self.cache: Dict[str, Dict[str, Any]] = {}
 
     def _hash(self, prompt: str) -> str:
-        """Create a hash of the prompt."""
         return hashlib.md5(prompt.encode()).hexdigest()
 
     def get(self, prompt: str) -> Optional[str]:
-        """Get cached response."""
         key = self._hash(prompt)
         if key in self.cache:
             data = self.cache[key]
@@ -101,7 +93,6 @@ class ResponseCache:
         return None
 
     def set(self, prompt: str, response: str) -> None:
-        """Cache a response."""
         key = self._hash(prompt)
         self.cache[key] = {
             "response": response,
@@ -109,21 +100,101 @@ class ResponseCache:
         }
 
     def clear(self) -> None:
-        """Clear the cache."""
         self.cache.clear()
 
 
-class OpenAIClient:
-    """OpenAI API client for code analysis."""
+class LLMClient:
+    """Unified LLM client supporting MiniMax M2.1 and OpenAI."""
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv(config.openai.api_key_env)
-        if not self.api_key:
-            raise ValueError(f"OpenAI API key not set. Set {config.openai.api_key_env}")
+        minimax_key = os.getenv("MINIMAX_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
 
-        self.client = AsyncOpenAI(api_key=self.api_key)
-        self.cache = ResponseCache(ttl=config.openai.cache_ttl)
+        if minimax_key:
+            self.provider = "minimax"
+            self.api_key = minimax_key
+        elif openai_key:
+            self.provider = "openai"
+            self.api_key = openai_key
+        elif api_key:
+            self.provider = "minimax"
+            self.api_key = api_key
+        else:
+            raise ValueError("No API key found. Set MINIMAX_API_KEY or OPENAI_API_KEY")
+
+        self.cache = ResponseCache(ttl=3600)
         self.total_tokens_used = 0
+        self.model = "MiniMax-M2.1"
+
+        logger.info(f"Using LLM provider: {self.provider}")
+
+    async def _call_minimax(self, prompt: str) -> str:
+        """Call MiniMax M2.1 API."""
+        import httpx
+
+        api_base = getattr(config.minimax, 'api_base', 'https://api.minimax.chat/v1/text/chatcompletion_v2')
+        model = getattr(config.minimax, 'model', 'MiniMax-M2.1')
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                api_base,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are an expert software engineer and code reviewer. "
+                            "Always respond with valid JSON. Be thorough but concise.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "max_tokens": 4096,
+                    "temperature": 0.3,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            if "choices" in data and len(data["choices"]) > 0:
+                content = data["choices"][0]["message"]["content"]
+                return content.strip()
+            else:
+                raise ValueError(f"Unexpected MiniMax response format: {data}")
+
+    async def _call_openai(self, prompt: str) -> str:
+        """Call OpenAI API."""
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=self.api_key)
+        response = await client.chat.completions.create(
+            model=getattr(config.openai, 'model', 'gpt-4o'),
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert software engineer and code reviewer. "
+                    "Always respond with valid JSON. Be thorough but concise.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=getattr(config.openai, 'max_tokens', 4096),
+            temperature=getattr(config.openai, 'temperature', 0.3),
+        )
+
+        content = response.choices[0].message.content
+        if content is None:
+            raise ValueError("Empty response from OpenAI")
+        return content.strip()
+
+    async def _call_api(self, prompt: str) -> str:
+        """Call the appropriate LLM API based on configured provider."""
+        if self.provider == "minimax":
+            return await self._call_minimax(prompt)
+        else:
+            return await self._call_openai(prompt)
 
     async def analyze_code(
         self,
@@ -147,10 +218,9 @@ Provide a JSON response with:
 4. summary (brief summary of the code)
 """
 
-        if config.openai.cache_enabled:
-            cached = self.cache.get(prompt)
-            if cached:
-                return safe_parse_json(cached)
+        cached = self.cache.get(prompt)
+        if cached:
+            return safe_parse_json(cached)
 
         response = await self._call_api(prompt)
         self.cache.set(prompt, response)
@@ -164,7 +234,6 @@ Provide a JSON response with:
         structure_info: Dict[str, Any],
     ) -> ReviewResult:
         """Perform a comprehensive review of a repository."""
-        # Limit content to stay under token limits (roughly 4 chars per token)
         files_text = "\n\n".join(
             f"=== {path} ===\n{content[:1500]}"
             for path, content in list(file_contents.items())[:10]
@@ -209,11 +278,10 @@ Focus on identifying:
 5. Missing tests
 """
 
-        if config.openai.cache_enabled:
-            cached = self.cache.get(prompt)
-            if cached:
-                data = safe_parse_json(cached)
-                return self._build_review_result(repo_name, data, len(file_contents))
+        cached = self.cache.get(prompt)
+        if cached:
+            data = safe_parse_json(cached)
+            return self._build_review_result(repo_name, data, len(file_contents))
 
         response = await self._call_api(prompt)
         self.cache.set(prompt, response)
@@ -261,35 +329,6 @@ Provide a JSON array of improvement suggestions:
 Provide a comprehensive markdown documentation:"""
 
         return await self._call_api(prompt)
-
-    async def _call_api(self, prompt: str, max_tokens: Optional[int] = None) -> str:
-        """Make a call to the OpenAI API."""
-        try:
-            response: ChatCompletion = await self.client.chat.completions.create(
-                model=config.openai.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert software engineer and code reviewer. "
-                        "Always respond with valid JSON. Be thorough but concise.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=max_tokens or config.openai.max_tokens,
-                temperature=config.openai.temperature,
-            )
-
-            self.total_tokens_used += response.usage.total_tokens
-            content = response.choices[0].message.content
-
-            if content is None:
-                raise ValueError("Empty response from OpenAI")
-
-            return content.strip()
-
-        except Exception as e:
-            logger.error(f"OpenAI API error: {e}")
-            raise
 
     def _get_file_extension(self, file_path: str) -> str:
         """Get file extension for code block."""
@@ -349,3 +388,7 @@ Provide a comprehensive markdown documentation:"""
     def clear_cache(self) -> None:
         """Clear the response cache."""
         self.cache.clear()
+
+
+# Backward compatibility alias
+OpenAIClient = LLMClient
