@@ -50,7 +50,7 @@ def parse_repo_status(content: str) -> Dict[str, Any]:
     if "overall" not in result or result["overall_score"] == 0:
         overall_match = re.search(r"Quality Score[:\s]*[:\*]*\s*(\d+)/?(\d*)", content, re.IGNORECASE)
         if overall_match:
-            result["overall_score"] = int(overall_match.group(1))
+            result["overall_score"] = int(match.group(1))
 
     # Extract summary
     summary_match = re.search(r"## Summary\s*\n(.+?)(?:\n##|$)", content, re.DOTALL)
@@ -115,76 +115,44 @@ async def sync_repo_status():
             # Parse the content
             parsed = parse_repo_status(status_file.content)
 
-            # Upsert into repositories table
-            await db.execute(
-                """
-                INSERT INTO repositories (name, full_name, description, html_url, 
-                                         clone_url, language, is_private, is_archived,
-                                         is_fork, stargazers_count, forks_count, 
-                                         open_issues_count, created_at, updated_at, 
-                                         last_reviewed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(full_name) DO UPDATE SET
-                    description = excluded.description,
-                    language = excluded.language,
-                    is_archived = excluded.is_archived,
-                    stargazers_count = excluded.stargazers_count,
-                    forks_count = excluded.forks_count,
-                    open_issues_count = excluded.open_issues_count,
-                    updated_at = excluded.updated_at,
-                    last_reviewed_at = excluded.last_reviewed_at
-                """,
-                (
-                    repo.name,
-                    full_name,
-                    repo.description,
-                    repo.html_url,
-                    repo.clone_url,
-                    repo.language,
-                    int(repo.is_private),
-                    int(repo.is_archived),
-                    int(repo.is_fork),
-                    repo.stargazers_count,
-                    repo.forks_count,
-                    repo.open_issues_count,
-                    repo.created_at,
-                    repo.updated_at,
-                    parsed.get("last_updated") or datetime.utcnow(),
-                ),
-            )
+            # Save repository using db method
+            repo_data = {
+                "name": repo.name,
+                "full_name": full_name,
+                "description": repo.description,
+                "html_url": repo.html_url,
+                "clone_url": repo.clone_url,
+                "language": repo.language,
+                "is_private": int(repo.is_private),
+                "is_archived": int(repo.is_archived),
+                "is_fork": int(repo.is_fork),
+                "stargazers_count": repo.stargazers_count,
+                "forks_count": repo.forks_count,
+                "open_issues_count": repo.open_issues_count,
+                "created_at": repo.created_at,
+                "updated_at": repo.updated_at,
+                "last_reviewed_at": parsed.get("last_updated") or datetime.utcnow(),
+            }
 
-            # Get repository ID
-            result = await db.fetchone(
-                "SELECT id FROM repositories WHERE full_name = ?", (full_name,)
-            )
-            if result:
-                repo_id = result[0]
+            await db.save_repository(repo_data)
 
-                # Insert review session
-                await db.execute(
-                    """
-                    INSERT INTO review_sessions (repository_id, status, overall_score,
-                                                quality_score, documentation_score,
-                                                structure_score, testing_score, summary,
-                                                stuck_areas, next_steps, started_at, 
-                                                completed_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        repo_id,
-                        parsed.get("status", "unknown"),
-                        parsed.get("overall_score", 0),
-                        parsed.get("code_quality_score", 0),
-                        parsed.get("documentation_score", 0),
-                        parsed.get("structure_score", 0),
-                        parsed.get("testing_score", 0),
-                        parsed.get("summary", "")[:1000],
-                        str(parsed.get("stuck_areas", [])),
-                        str(parsed.get("next_steps", [])),
-                        parsed.get("last_updated") or datetime.utcnow(),
-                        datetime.utcnow(),
-                    ),
-                )
+            # Get the repository from database
+            db_repo = await db.get_repository(full_name)
+            if db_repo:
+                # Save review session
+                review_result = {
+                    "status": parsed.get("status", "completed"),
+                    "overall_score": parsed.get("overall_score", 0),
+                    "quality_score": parsed.get("code_quality_score", 0),
+                    "documentation_score": parsed.get("documentation_score", 0),
+                    "structure_score": parsed.get("structure_score", 0),
+                    "testing_score": parsed.get("testing_score", 0),
+                    "summary": parsed.get("summary", "")[:1000],
+                    "stuck_areas": str(parsed.get("stuck_areas", [])),
+                    "next_steps": str(parsed.get("next_steps", [])),
+                }
+
+                await db.save_review_session(db_repo, review_result)
 
                 logger.info(f"  ✓ Synced: {full_name} | Status: {parsed.get('status')} | Score: {parsed.get('overall_score')}")
                 synced += 1
