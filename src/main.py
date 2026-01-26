@@ -13,10 +13,8 @@ logger = get_logger(__name__)
 
 def check_environment() -> bool:
     """Check that required environment variables are set."""
-    from .core.config import settings
 
     minimax_key = os.getenv("MINIMAX_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
     github_token = os.getenv("GITHUB_TOKEN")
 
     if not github_token:
@@ -24,16 +22,12 @@ def check_environment() -> bool:
         logger.info("Please set GITHUB_TOKEN in your .env file or environment")
         return False
 
-    if not minimax_key and not openai_key:
-        logger.error("Missing required environment variable: MINIMAX_API_KEY or OPENAI_API_KEY")
-        logger.info("Please set either MINIMAX_API_KEY or OPENAI_API_KEY in your .env file")
+    if not minimax_key:
+        logger.error("Missing required environment variable: MINIMAX_API_KEY")
+        logger.info("Please set MINIMAX_API_KEY in your .env file")
         return False
 
-    if minimax_key:
-        logger.info("Using MiniMax M2.1 API")
-    else:
-        logger.info("Using OpenAI API")
-
+    logger.info("Using MiniMax M2.1 API")
     logger.info("Environment check passed")
     return True
 
@@ -44,6 +38,7 @@ async def run_review_all() -> None:
     from .review import ReviewOrchestrator
     from .report import ReportGenerator, RepoCommitter
     from .core.database import Database
+    from .llm import LLMClient
 
     config = get_config()
     db = Database()
@@ -51,11 +46,12 @@ async def run_review_all() -> None:
     await db.connect()
 
     github = GitHubClient()
+    llm = LLMClient()
     repos = await github.list_all_repositories()
 
     logger.info(f"Found {len(repos)} repositories to review")
 
-    orchestrator = ReviewOrchestrator(github)
+    orchestrator = ReviewOrchestrator(github, llm)
     report_gen = ReportGenerator()
     committer = RepoCommitter(github)
 
@@ -132,7 +128,7 @@ def main() -> int:
 
         elif command in ("--help", "-h", "help"):
             print("""
-Project Agent - AI-powered GitHub project management
+Project Agent - AI-powered GitHub project management using MiniMax M2.1
 
 Usage: python -m src [command]
 

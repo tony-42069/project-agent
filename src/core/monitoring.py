@@ -320,10 +320,10 @@ def setup_default_checks() -> None:
         except Exception as e:
             return {"healthy": False, "message": str(e)}
 
-    async def check_openai():
+    async def check_llm():
         try:
-            from ..openai import OpenAIClient
-            client = OpenAIClient()
+            from ..llm import LLMClient
+            client = LLMClient()
             usage = client.get_token_usage()
             return {"healthy": True, "tokens_used": usage.get("total_tokens", 0)}
         except Exception as e:
@@ -331,7 +331,7 @@ def setup_default_checks() -> None:
 
     health_checker.register_component("database", check_database, critical=True)
     health_checker.register_component("github", check_github, critical=False)
-    health_checker.register_component("openai", check_openai, critical=False)
+    health_checker.register_component("llm", check_llm, critical=False)
 
 
 setup_default_checks()

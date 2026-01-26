@@ -8,7 +8,7 @@ from ..core.config import get_config
 from ..core.database import Database
 from ..core.logging_ import get_logger
 from ..github import GitHubClient, Repository
-from ..openai import OpenAIClient
+from ..llm import LLMClient
 from .analyzer import CodeAnalyzer
 from .templates import ReviewTemplates
 
@@ -23,13 +23,13 @@ class ReviewOrchestrator:
     def __init__(
         self,
         github_client: GitHubClient,
-        openai_client: Optional[OpenAIClient] = None,
+        llm_client: Optional[LLMClient] = None,
         db: Optional[Database] = None,
     ):
         self.github = github_client
-        self.openai = openai_client or OpenAIClient()
+        self.llm = llm_client or LLMClient()
         self.db = db
-        self.analyzer = CodeAnalyzer(self.github, self.openai)
+        self.analyzer = CodeAnalyzer(self.github, self.llm)
 
     def _is_status_file_meaningful(self, content: str) -> bool:
         """Check if REPO_STATUS.md has meaningful content."""
@@ -126,7 +126,7 @@ Agent performed a check - existing review is still current. No new issues detect
                     if content:
                         file_contents[file_info["path"]] = content.content
 
-            ai_review = await self.openai.review_repository(
+            ai_review = await self.llm.review_repository(
                 repo.full_name, file_contents, structure_info
             )
 

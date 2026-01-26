@@ -12,7 +12,7 @@ from ..core.config import get_config
 from ..core.database import Database
 from ..core.logging_ import get_logger
 from ..github import GitHubClient
-from ..openai import OpenAIClient
+from ..llm import LLMClient
 from ..report import ReportGenerator
 from ..review import ReviewOrchestrator
 
@@ -46,9 +46,9 @@ app.add_middleware(
 )
 
 github = GitHubClient()
-openai = OpenAIClient()
+llm = LLMClient()
 db = Database()
-orchestrator = ReviewOrchestrator(github, openai, db)
+orchestrator = ReviewOrchestrator(github, llm, db)
 report_gen = ReportGenerator()
 
 

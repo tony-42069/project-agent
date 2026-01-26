@@ -5,7 +5,7 @@ __author__ = "Project Agent"
 
 from .core import Config, settings, Database, get_db, LoggingMixin, get_logger
 from .github import GitHubClient
-from .openai import OpenAIClient
+from .llm import LLMClient
 from .review import CodeAnalyzer, ReviewOrchestrator, RepoDiscovery, DocumentationAnalyzer
 from .report import (
     ReportGenerator,
@@ -33,7 +33,7 @@ __all__ = [
     "LoggingMixin",
     "get_logger",
     "GitHubClient",
-    "OpenAIClient",
+    "LLMClient",
     "CodeAnalyzer",
     "ReviewOrchestrator",
     "RepoDiscovery",

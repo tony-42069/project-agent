@@ -1,4 +1,4 @@
-"""LLM integration for code review - supports MiniMax M2.1 and OpenAI."""
+"""MiniMax M2.1 integration for code review."""
 
 import hashlib
 import json
@@ -8,6 +8,8 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+import httpx
 
 from ..core.config import get_config
 from ..core.logging_ import get_logger
@@ -104,46 +106,36 @@ class ResponseCache:
 
 
 class LLMClient:
-    """Unified LLM client supporting MiniMax M2.1 and OpenAI."""
+    """MiniMax M2.1 client for code review."""
 
-    def __init__(self, api_key: Optional[str] = None):
-        minimax_key = os.getenv("MINIMAX_API_KEY")
-        openai_key = os.getenv("OPENAI_API_KEY")
+    def __init__(self):
+        self.api_key = os.getenv("MINIMAX_API_KEY")
+        if not self.api_key:
+            raise ValueError("MINIMAX_API_KEY not set. Please set it in your .env file.")
 
-        if minimax_key:
-            self.provider = "minimax"
-            self.api_key = minimax_key
-        elif openai_key:
-            self.provider = "openai"
-            self.api_key = openai_key
-        elif api_key:
-            self.provider = "minimax"
-            self.api_key = api_key
-        else:
-            raise ValueError("No API key found. Set MINIMAX_API_KEY or OPENAI_API_KEY")
-
+        self.model = "MiniMax-M2.1"
         self.cache = ResponseCache(ttl=3600)
         self.total_tokens_used = 0
-        self.model = "MiniMax-M2.1"
 
-        logger.info(f"Using LLM provider: {self.provider}")
+        api_base = getattr(config, 'minimax', type('obj', (object,), {'api_base': 'https://api.minimax.chat/v1/text/chatcompletion_v2', 'model': 'MiniMax-M2.1', 'max_tokens': 4096, 'temperature': 0.3, 'cache_enabled': True, 'cache_ttl': 3600})())
+        self.api_base = api_base.api_base
+        self.max_tokens = api_base.max_tokens
+        self.temperature = api_base.temperature
+        self.cache_enabled = api_base.cache_enabled
 
-    async def _call_minimax(self, prompt: str) -> str:
+        logger.info(f"MiniMax M2.1 client initialized")
+
+    async def _call_api(self, prompt: str) -> str:
         """Call MiniMax M2.1 API."""
-        import httpx
-
-        api_base = getattr(config.minimax, 'api_base', 'https://api.minimax.chat/v1/text/chatcompletion_v2')
-        model = getattr(config.minimax, 'model', 'MiniMax-M2.1')
-
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
-                api_base,
+                self.api_base,
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": model,
+                    "model": self.model,
                     "messages": [
                         {
                             "role": "system",
@@ -152,8 +144,8 @@ class LLMClient:
                         },
                         {"role": "user", "content": prompt},
                     ],
-                    "max_tokens": 4096,
-                    "temperature": 0.3,
+                    "max_tokens": self.max_tokens,
+                    "temperature": self.temperature,
                 },
             )
             response.raise_for_status()
@@ -164,37 +156,6 @@ class LLMClient:
                 return content.strip()
             else:
                 raise ValueError(f"Unexpected MiniMax response format: {data}")
-
-    async def _call_openai(self, prompt: str) -> str:
-        """Call OpenAI API."""
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(api_key=self.api_key)
-        response = await client.chat.completions.create(
-            model=getattr(config.openai, 'model', 'gpt-4o'),
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert software engineer and code reviewer. "
-                    "Always respond with valid JSON. Be thorough but concise.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=getattr(config.openai, 'max_tokens', 4096),
-            temperature=getattr(config.openai, 'temperature', 0.3),
-        )
-
-        content = response.choices[0].message.content
-        if content is None:
-            raise ValueError("Empty response from OpenAI")
-        return content.strip()
-
-    async def _call_api(self, prompt: str) -> str:
-        """Call the appropriate LLM API based on configured provider."""
-        if self.provider == "minimax":
-            return await self._call_minimax(prompt)
-        else:
-            return await self._call_openai(prompt)
 
     async def analyze_code(
         self,
@@ -218,9 +179,10 @@ Provide a JSON response with:
 4. summary (brief summary of the code)
 """
 
-        cached = self.cache.get(prompt)
-        if cached:
-            return safe_parse_json(cached)
+        if self.cache_enabled:
+            cached = self.cache.get(prompt)
+            if cached:
+                return safe_parse_json(cached)
 
         response = await self._call_api(prompt)
         self.cache.set(prompt, response)
@@ -278,10 +240,11 @@ Focus on identifying:
 5. Missing tests
 """
 
-        cached = self.cache.get(prompt)
-        if cached:
-            data = safe_parse_json(cached)
-            return self._build_review_result(repo_name, data, len(file_contents))
+        if self.cache_enabled:
+            cached = self.cache.get(prompt)
+            if cached:
+                data = safe_parse_json(cached)
+                return self._build_review_result(repo_name, data, len(file_contents))
 
         response = await self._call_api(prompt)
         self.cache.set(prompt, response)
@@ -388,7 +351,3 @@ Provide a comprehensive markdown documentation:"""
     def clear_cache(self) -> None:
         """Clear the response cache."""
         self.cache.clear()
-
-
-# Backward compatibility alias
-OpenAIClient = LLMClient
