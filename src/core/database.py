@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    select,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
@@ -168,18 +169,19 @@ class Database:
     async def save_repository(self, repo_data: Dict[str, Any]) -> Repository:
         """Save or update repository metadata."""
         async with self.session() as session:
-            existing = await session.execute(
-                Repository.__table__.select().where(
-                    Repository.full_name == repo_data["full_name"]
-                )
+            # Use scalars() to get Repository objects instead of Row objects
+            result = await session.execute(
+                select(Repository).where(Repository.full_name == repo_data["full_name"])
             )
-            result = existing.fetchone()
+            repo = result.scalar_one_or_none()
 
-            if result:
+            if repo:
+                # Update existing repo
                 for key, value in repo_data.items():
-                    setattr(result, key, value)
-                repo = result
+                    if hasattr(repo, key) and key != "id":
+                        setattr(repo, key, value)
             else:
+                # Create new repo
                 repo = Repository(**repo_data)
                 session.add(repo)
 
@@ -202,9 +204,9 @@ class Database:
                 full_name = repo.full_name if hasattr(repo, "full_name") else repo.get("full_name")
                 if full_name:
                     result = await session.execute(
-                        Repository.__table__.select().where(Repository.full_name == full_name)
+                        select(Repository).where(Repository.full_name == full_name)
                     )
-                    db_repo = result.fetchone()
+                    db_repo = result.scalar_one_or_none()
                     if db_repo:
                         repo_id = db_repo.id
 
@@ -233,22 +235,22 @@ class Database:
         """Get repository by full name."""
         async with self.session() as session:
             result = await session.execute(
-                Repository.__table__.select().where(Repository.full_name == full_name)
+                select(Repository).where(Repository.full_name == full_name)
             )
-            return result.fetchone()
+            return result.scalar_one_or_none()
 
     async def list_repositories(
         self, include_archived: bool = False, limit: int = 100
     ) -> List[Repository]:
         """List all tracked repositories."""
         async with self.session() as session:
-            query = Repository.__table__.select()
+            query = select(Repository)
             if not include_archived:
                 query = query.where(Repository.is_archived == 0)
             query = query.limit(limit)
 
             result = await session.execute(query)
-            return result.fetchall()
+            return list(result.scalars().all())
 
     async def create_task(self, task_data: Dict[str, Any]) -> Task:
         """Create a new task."""
@@ -263,12 +265,13 @@ class Database:
         """Update a task."""
         async with self.session() as session:
             result = await session.execute(
-                Task.__table__.select().where(Task.id == task_id)
+                select(Task).where(Task.id == task_id)
             )
-            task = result.fetchone()
+            task = result.scalar_one_or_none()
             if task:
                 for key, value in updates.items():
-                    setattr(task, key, value)
+                    if hasattr(task, key) and key != "id":
+                        setattr(task, key, value)
             return task
 
 
