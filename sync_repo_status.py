@@ -29,54 +29,61 @@ def parse_repo_status(content: str) -> Dict[str, Any]:
         "last_updated": None,
     }
 
-    # Extract status
-    status_match = re.search(r"\*\*Status[:\s]*[:\*]*\s*(.+?)(?:\n|\*\*|$)", content, re.IGNORECASE)
-    if status_match:
-        result["status"] = status_match.group(1).strip().strip("*")
+    # Extract status from Summary section
+    summary_match = re.search(r"## Summary\s*\n(.+?)(?:\n##|$)", content, re.DOTALL)
+    if summary_match:
+        summary_text = summary_match.group(1).strip()
+        result["summary"] = summary_text[:500]
+        # Determine status based on summary content
+        if "verified and updated" in summary_text.lower():
+            result["status"] = "completed"
+        elif "incomplete" in summary_text.lower():
+            result["status"] = "incomplete"
+        elif "needs review" in summary_text.lower():
+            result["status"] = "needs_review"
+        elif "no issues" in summary_text.lower() or "no critical" in summary_text.lower():
+            result["status"] = "healthy"
 
-    # Extract quality scores
+    # Extract quality scores from table format: | **Overall** | `███` 0% |
     score_patterns = {
-        "overall": r"Overall[:\s]+(\d+)",
-        "code_quality": r"Code Quality[:\s]+(\d+)",
-        "documentation": r"Documentation[:\s]+(\d+)",
-        "structure": r"Structure[:\s]+(\d+)",
-        "testing": r"Testing[:\s]+(\d+)",
+        "overall": r"\*\*Overall\*\*.*?(\d+)\s*%",
+        "code_quality": r"Code Quality.*?(\d+)\s*%",
+        "documentation": r"Documentation.*?(\d+)\s*%",
+        "structure": r"Structure.*?(\d+)\s*%",
+        "testing": r"Testing.*?(\d+)\s*%",
     }
+
     for key, pattern in score_patterns.items():
-        match = re.search(pattern, content, re.IGNORECASE)
+        match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
         if match:
             result[f"{key}_score"] = int(match.group(1))
 
-    if "overall" not in result or result["overall_score"] == 0:
-        overall_match = re.search(r"Quality Score[:\s]*[:\*]*\s*(\d+)/?(\d*)", content, re.IGNORECASE)
-        if overall_match:
-            result["overall_score"] = int(match.group(1))
-
-    # Extract summary
-    summary_match = re.search(r"## Summary\s*\n(.+?)(?:\n##|$)", content, re.DOTALL)
-    if summary_match:
-        result["summary"] = summary_match.group(1).strip()[:500]
-
     # Extract stuck areas
-    stuck_section = re.search(r"Stuck Areas?[:\s]*\n([\s\S]*?)(?:\n##|\n###|$)", content, re.IGNORECASE)
+    stuck_section = re.search(r"## Stuck Areas?\s*\n([\s\S]*?)(?:\n##|\n\n##|$)", content)
     if stuck_section:
-        areas = re.findall(r"[-•*]\s*(.+)", stuck_section.group(1))
-        result["stuck_areas"] = [a.strip() for a in areas if a.strip()]
+        areas_text = stuck_section.group(1)
+        if "no stuck areas" not in areas_text.lower():
+            areas = re.findall(r"[-•*]\s*(.+)", areas_text)
+            result["stuck_areas"] = [a.strip() for a in areas if a.strip()]
 
     # Extract next steps
-    next_steps_section = re.search(r"Next Steps?[:\s]*\n([\s\S]*?)(?:\n##|\n###|$)", content, re.IGNORECASE)
+    next_steps_section = re.search(r"## Next Steps?\s*\n([\s\S]*?)(?:\n##|\n\n##|$)", content)
     if next_steps_section:
-        steps = re.findall(r"[-•*]\s*(.+)", next_steps_section.group(1))
-        result["next_steps"] = [s.strip() for s in steps if s.strip()]
+        steps_text = next_steps_section.group(1)
+        if "no specific next steps" not in steps_text.lower():
+            steps = re.findall(r"[-•*]\s*(.+)", steps_text)
+            result["next_steps"] = [s.strip() for s in steps if s.strip()]
 
     # Extract issues
-    issues_section = re.search(r"Issues? Found[:\s]*\n([\s\S]*?)(?:\n##|\n###|$)", content, re.IGNORECASE)
+    issues_section = re.search(r"## Issues? Found?\s*\n([\s\S]*?)(?:\n##|\n\n##|$)", content)
     if issues_section:
-        issues = re.findall(r"[-•*]\s*(.+)", issues_section.group(1))
-        result["issues"] = [i.strip() for i in issues if i.strip()]
+        issues_text = issues_section.group(1)
+        if "no critical issues" not in issues_text.lower() and "no issues" not in issues_text.lower():
+            issues = re.findall(r"[-•*]\s*(.+)", issues_text)
+            result["issues"] = [i.strip() for i in issues if i.strip()]
 
-    # Extract last updated date
-    date_match = re.search(r"(\d{4}-\d{2}-\d{2})", content)
+    # Extract generated date
+    date_match = re.search(r"Generated:\s*(\d{4}-\d{2}-\d{2})", content)
     if date_match:
         try:
             result["last_updated"] = datetime.strptime(date_match.group(1), "%Y-%m-%d")
